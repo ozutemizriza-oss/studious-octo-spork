@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tarih Bulmacası</title>
+<style>
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #34495e;
+    --accent-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #e67e22;
+    --danger-color: #e74c3c;
+    --purple-color: #8e44ad;
+    --bg-color: #ecf0f1;
+    --text-color: #333;
+}
+* { box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100dvh; margin: 0; padding: 16px; text-align: center;
+}
+.container {
+    background: #fff; padding: 30px; border-radius: 12px;
+    box-shadow: 0 8px 16px rgba(0,0,0,.1); width: 100%; max-width: 600px;
+}
+h1 { margin-top: 0; color: var(--primary-color); }
+h2 { margin: 10px 0; color: var(--secondary-color); }
+.hidden { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: #7f8c8d; font-size: 14px; }
+.record { font-weight: bold; color: var(--secondary-color); margin-top: 15px; }
+
+/* Ortak buton ve select */
+select {
+    padding: 12px; font-size: 16px; border-radius: 6px;
+    border: 1px solid #bdc3c7; width: 100%; margin-top: 4px;
+}
+button {
+    padding: 12px 20px; font-size: 16px; font-weight: bold; color: #fff;
+    border: none; border-radius: 6px; cursor: pointer; width: 100%;
+    transition: transform .2s, opacity .2s;
+}
+button:not(:disabled):hover { transform: translateY(-2px); opacity: .9; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:focus-visible, select:focus-visible { outline: 3px solid var(--accent-color); outline-offset: 2px; }
+.btn-start  { background: var(--accent-color);  margin-top: 15px; padding: 15px; }
+.btn-submit { background: var(--success-color); margin-top: 15px; }
+.btn-hint   { background: var(--purple-color);  margin-bottom: 15px; }
+.btn-row { display: flex; gap: 10px; margin-top: 10px; }
+.btn-pass  { background: var(--warning-color); }
+.btn-pause { background: var(--secondary-color); }
+.btn-end   { background: var(--danger-color); }
+
+/* Hazırlık ekranı */
+.prep-box { background: #f8f9fa; border: 2px dashed #bdc3c7; padding: 20px; border-radius: 10px; margin: 20px 0; }
+.prep-title { font-size: 22px; color: var(--primary-color); font-weight: bold; margin-bottom: 15px; }
+.field { text-align: left; margin-bottom: 15px; }
+.field:last-child { margin-bottom: 0; }
+.field label { display: block; font-weight: bold; }
+
+/* Oyun ekranı */
+.header-info {
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+    font-size: 17px; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px;
+    border-bottom: 2px solid #eee; color: var(--primary-color);
+}
+.time-box.urgent { color: var(--danger-color); }
+.clue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; transition: filter .2s; }
+.clue-box {
+    background: var(--primary-color); color: #fff; padding: 20px 10px; border-radius: 8px;
+    font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+    min-height: 60px; box-shadow: 0 4px 6px rgba(0,0,0,.05);
+}
+.clue-box.locked { background: #95a5a6; }
+.paused .clue-grid { filter: blur(10px); }
+input[type="text"] {
+    width: 100%; padding: 15px; font-size: 18px; border: 2px solid #bdc3c7;
+    border-radius: 6px; margin-bottom: 10px; text-align: center;
+}
+input[type="text"]:focus { border-color: var(--accent-color); outline: none; }
+.feedback { min-height: 24px; font-weight: bold; margin-top: 12px; }
+.correct-text { color: var(--success-color); }
+.wrong-text { color: var(--danger-color); }
+.info-text { color: var(--accent-color); }
+.final-score { font-size: 24px; }
+.final-score b { color: var(--accent-color); }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- KARŞILAMA EKRANI -->
+    <div id="welcome-screen">
+        <h1>Tarih Bulmacası</h1>
+        <p>İpuçlarını oku, tarihi olayı veya kişiyi bul!</p>
+        <p class="muted">Sorular sırasıyla gelecek. Her soru öncesi süreyi ve ipucu modunu ayarlayabilirsiniz.</p>
+        <div class="record">🏆 En Yüksek Puan: <span id="welcome-best">0</span></div>
+        <button class="btn-start" id="btn-start">Oyunu Başlat</button>
+    </div>
+
+    <!-- SORU HAZIRLIK EKRANI (Hoca İçin) -->
+    <div id="prep-screen" class="hidden">
+        <div class="prep-box">
+            <div class="prep-title"><span id="prep-question-number">1</span>. Soru İçin Hazırlık</div>
+            <div class="field">
+                <label for="time-select">Süre</label>
+                <select id="time-select">
+                    <option value="30">30 Saniye</option>
+                    <option value="60" selected>60 Saniye</option>
+                    <option value="90">90 Saniye</option>
+                    <option value="120">120 Saniye</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="mode-select">İpucu Modu</label>
+                <select id="mode-select">
+                    <option value="all" selected>Tüm ipuçları açık</option>
+                    <option value="progressive">Aşamalı (her ek ipucu -2 puan)</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn-start" id="btn-begin-question">Soruyu Başlat</button>
+        <div class="record">Mevcut Puan: <span id="prep-score">0</span></div>
+    </div>
+
+    <!-- OYUN EKRANI -->
+    <div id="game-screen" class="hidden">
+        <div class="header-info">
+            <span>Puan: <span id="score-display">0</span></span>
+            <span>Soru: <span id="question-count">1</span>/<span id="total-questions">0</span></span>
+            <span>Hak: <span id="attempts-display">3</span></span>
+            <span class="time-box" id="time-box">⏱️ <span id="time-display">60</span> sn</span>
+        </div>
+
+        <div class="clue-grid" id="clue-container"></div>
+        <button class="btn-hint hidden" id="btn-hint">İpucu Aç</button>
+
+        <label for="answer-input" class="sr-only">Cevabınız</label>
+        <input type="text" id="answer-input" placeholder="Cevabınızı buraya yazın..." autocomplete="off">
+        <button class="btn-submit" id="btn-submit">Cevapla (Enter)</button>
+        <div class="btn-row">
+            <button class="btn-pass" id="btn-pass">Pas Geç (<span id="pass-count">1</span>)</button>
+            <button class="btn-pause" id="btn-pause">Duraklat</button>
+            <button class="btn-end" id="btn-end">Oyunu Bitir</button>
+        </div>
+
+        <div id="feedback-message" class="feedback" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- OYUN SONU EKRANI -->
+    <div id="end-screen" class="hidden">
+        <h2>Oyun Bitti!</h2>
+        <p class="final-score">Toplam Puanın: <b id="final-score">0</b></p>
+        <p>Görülen Soru Sayısı: <span id="final-questions">0</span></p>
+        <p class="record">🏆 En Yüksek Puan: <span id="final-best">0</span> <span id="new-record" class="hidden">— Yeni rekor!</span></p>
+        <button class="btn-start" id="btn-restart">Ana Menüye Dön</button>
+    </div>
+</div>
+
+<script>
+const SORU_HAVUZU = [
+    {
+        ipuclari: ["1453 Yılı", "Bizans İmparatorluğu", "Şahi Topu", "Fatih Sultan Mehmet"],
+        cevap: ["İstanbul'un Fethi", "İstanbulun Fethi"]
+    },
+    {
+        ipuclari: ["1915 Yılı", "Seyit Onbaşı", "Dur Yolcu", "Boğazın Geçilememesi"],
+        cevap: ["Çanakkale Savaşı", "Çanakkale Cephesi", "Çanakkale Zaferi"]
+    },
+    {
+        ipuclari: ["29 Ekim 1923", "Egemenlik", "Ankara", "Mustafa Kemal Atatürk"],
+        cevap: ["Cumhuriyetin İlanı", "Cumhuriyetin İlan Edilmesi"]
+    },
+    {
+        ipuclari: ["1071 Yılı", "Alparslan", "Romen Diyojen", "Anadolu'nun Kapıları"],
+        cevap: ["Malazgirt Savaşı", "Malazgirt Meydan Muharebesi"]
+    },
+    {
+        ipuclari: ["İlk Yazılı Antlaşma", "Mısırlılar", "Hititler", "M.Ö. 1280"],
+        cevap: ["Kadeş Antlaşması", "Kadeş Barış Antlaşması"]
+    }
+];
+</script>
+
+<script>
+/* ===== Ayarlar ===== */
+const BASE_POINTS = 10;        // Bir sorunun temel puanı
+const TIME_BONUS_MAX = 5;      // Kalan süreye göre en fazla ek puan
+const CLUE_PENALTY = 2;        // Aşamalı modda açılan her ek ipucu için kesinti
+const MAX_ATTEMPTS = 3;        // Soru başına yanlış cevap hakkı
+const INITIAL_PASSES = 1;
+const PASS_BONUS_EVERY = 10;   // Her 10 soruda +1 pas hakkı
+const URGENT_SECONDS = 10;     // Bu süreden sonra sayaç kırmızı olur
+const BEST_KEY = 'tarihBulmacasiRekor';
+
+/* ===== Durum ===== */
+const state = {
+    index: 0, score: 0, passes: INITIAL_PASSES, seen: 0,
+    attempts: MAX_ATTEMPTS, shown: 0, clueMode: 'all', totalSeconds: 60,
+    deadline: 0, remaining: 0, paused: false, locked: true,
+    timerId: null, nextId: null, feedbackId: null
+};
+
+/* ===== Elementler ===== */
+const $ = id => document.getElementById(id);
+const screens = {
+    welcome: $('welcome-screen'), prep: $('prep-screen'),
+    game: $('game-screen'), end: $('end-screen')
+};
+const ui = {
+    timeSelect: $('time-select'), modeSelect: $('mode-select'),
+    time: $('time-display'), timeBox: $('time-box'),
+    score: $('score-display'), prepScore: $('prep-score'),
+    count: $('question-count'), total: $('total-questions'),
+    prepNumber: $('prep-question-number'), attempts: $('attempts-display'),
+    clues: $('clue-container'),
+    answer: $('answer-input'), pass: $('pass-count'),
+    feedback: $('feedback-message'),
+    btnSubmit: $('btn-submit'), btnPass: $('btn-pass'),
+    btnPause: $('btn-pause'), btnHint: $('btn-hint')
+};
+
+/* ===== Yardımcılar ===== */
+const currentQuestion = () => SORU_HAVUZU[state.index];
+const mainAnswer = () => currentQuestion().cevap[0];
+const remainingMs = () => Math.max(0, state.deadline - Date.now());
+const isBlocked = () => state.locked || state.paused;
+
+// Küçük harfe çevirir (Türkçe kurallarıyla), kesme işareti/noktalamayı ve fazla boşlukları temizler.
+const normalize = s => s
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[’'`´.,!?\-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+function showScreen(name) {
+    Object.entries(screens).forEach(([key, el]) => el.classList.toggle('hidden', key !== name));
+}
+
+function loadBest() {
+    try { return parseInt(localStorage.getItem(BEST_KEY), 10) || 0; } catch { return 0; }
+}
+function saveBest(value) {
+    try { localStorage.setItem(BEST_KEY, value); } catch { /* depolama kapalıysa sessizce geç */ }
+}
+
+function setInputEnabled(enabled) {
+    ui.answer.disabled = !enabled;
+    ui.btnSubmit.disabled = !enabled;
+    ui.btnPass.disabled = !enabled;
+    ui.btnHint.disabled = !enabled || state.shown >= currentQuestion().ipuclari.length;
+}
+
+function showFeedback(message, className) {
+    clearTimeout(state.feedbackId);
+    ui.feedback.textContent = message;
+    ui.feedback.className = 'feedback ' + className;
+    state.feedbackId = setTimeout(() => { ui.feedback.textContent = ''; }, 3000);
+}
+
+function clearFeedback() {
+    clearTimeout(state.feedbackId);
+    ui.feedback.textContent = '';
+}
+
+/* ===== Ekranlar ===== */
+function showWelcome() {
+    $('welcome-best').textContent = loadBest();
+    showScreen('welcome');
+}
+
+function initGame() {
+    Object.assign(state, { index: 0, score: 0, passes: INITIAL_PASSES, seen: 0 });
+    ui.total.textContent = SORU_HAVUZU.length;
+    showPrepScreen();
+}
+
+function showPrepScreen() {
+    if (state.index >= SORU_HAVUZU.length) { endGame(); return; }
+    ui.prepNumber.textContent = state.index + 1;
+    ui.prepScore.textContent = state.score;
+    showScreen('prep');
+}
+
+function startQuestion() {
+    const q = currentQuestion();
+    state.totalSeconds = parseInt(ui.timeSelect.value, 10);
+    state.clueMode = ui.modeSelect.value;
+    state.shown = state.clueMode === 'progressive' ? 1 : q.ipuclari.length;
+    state.attempts = MAX_ATTEMPTS;
+    state.paused = false;
+    state.locked = false;
+    state.seen++;
+
+    showScreen('game');
+    screens.game.classList.remove('paused');
+    ui.btnPause.textContent = 'Duraklat';
+    ui.btnPause.disabled = false;
+    ui.score.textContent = state.score;
+    ui.pass.textContent = state.passes;
+    ui.count.textContent = state.index + 1;
+    ui.attempts.textContent = state.attempts;
+    ui.answer.value = '';
+    clearFeedback();
+    renderClues();
+    updateHintButton();
+    setInputEnabled(true);
+    startTimer(state.totalSeconds * 1000);
+    setTimeout(() => ui.answer.focus(), 100);
+}
+
+/* ===== İpuçları ===== */
+function renderClues() {
+    const clues = currentQuestion().ipuclari;
+    ui.clues.replaceChildren(...clues.map((text, i) => {
+        const box = document.createElement('div');
+        const open = i < state.shown;
+        box.className = 'clue-box' + (open ? '' : ' locked');
+        box.textContent = open ? text : '?';
+        return box;
+    }));
+}
+
+function updateHintButton() {
+    const left = currentQuestion().ipuclari.length - state.shown;
+    const progressive = state.clueMode === 'progressive';
+    ui.btnHint.classList.toggle('hidden', !progressive);
+    ui.btnHint.textContent = `İpucu Aç (${left} kaldı, -${CLUE_PENALTY} puan)`;
+    ui.btnHint.disabled = isBlocked() || left <= 0;
+}
+
+function revealClue() {
+    if (isBlocked() || state.shown >= currentQuestion().ipuclari.length) return;
+    state.shown++;
+    renderClues();
+    updateHintButton();
+    ui.answer.focus();
+}
+
+/* ===== Zamanlayıcı ===== */
+function startTimer(ms) {
+    clearInterval(state.timerId);
+    state.deadline = Date.now() + ms;
+    tick();
+    state.timerId = setInterval(tick, 250);
+}
+
+function tick() {
+    const ms = remainingMs();
+    const seconds = Math.ceil(ms / 1000);
+    ui.time.textContent = seconds;
+    ui.timeBox.classList.toggle('urgent', seconds <= URGENT_SECONDS);
+    if (ms <= 0) {
+        clearInterval(state.timerId);
+        onTimeUp();
+    }
+}
+
+function togglePause() {
+    if (state.locked) return;
+    if (!state.paused) {
+        state.remaining = remainingMs();
+        clearInterval(state.timerId);
+        state.paused = true;
+    } else {
+        state.paused = false;
+        startTimer(state.remaining);
+    }
+    screens.game.classList.toggle('paused', state.paused);
+    ui.btnPause.textContent = state.paused ? 'Devam Et' : 'Duraklat';
+    setInputEnabled(!state.paused);
+    updateHintButton();
+    if (!state.paused) ui.answer.focus();
+}
+
+/* ===== Oyun akışı ===== */
+function calcPoints() {
+    const penalty = state.clueMode === 'progressive' ? (state.shown - 1) * CLUE_PENALTY : 0;
+    const bonus = Math.round(TIME_BONUS_MAX * remainingMs() / (state.totalSeconds * 1000));
+    return Math.max(1, BASE_POINTS - penalty) + bonus;
+}
+
+function checkAnswer() {
+    if (isBlocked()) return;
+    const given = normalize(ui.answer.value);
+    if (given === '') return;
+
+    const valid = currentQuestion().cevap.map(normalize);
+    if (valid.includes(given)) {
+        const points = calcPoints();
+        state.score += points;
+        ui.score.textContent = state.score;
+        showFeedback(`Doğru Cevap! +${points} Puan`, 'correct-text');
+        advance(1500);
+        return;
+    }
+
+    state.attempts--;
+    ui.attempts.textContent = state.attempts;
+    if (state.attempts <= 0) {
+        showFeedback(`Hakkın bitti! Cevap: ${mainAnswer()}`, 'wrong-text');
+        advance(2500);
+    } else {
+        showFeedback(`Yanlış! Kalan hak: ${state.attempts}`, 'wrong-text');
+        ui.answer.value = '';
+        ui.answer.focus();
+    }
+}
+
+function onTimeUp() {
+    showFeedback(`Süre Doldu! Cevap: ${mainAnswer()}`, 'wrong-text');
+    advance(2500);
+}
+
+function usePass() {
+    if (isBlocked()) return;
+    if (state.passes > 0) {
+        state.passes--;
+        ui.pass.textContent = state.passes;
+        showFeedback(`Pas geçildi. Cevap: ${mainAnswer()}`, 'info-text');
+        advance(2000);
+    } else {
+        showFeedback('Pas hakkınız kalmadı!', 'wrong-text');
+        ui.answer.focus();
+    }
+}
+
+function advance(delay) {
+    clearInterval(state.timerId);
+    state.locked = true;
+    setInputEnabled(false);
+    ui.btnPause.disabled = true;
+    state.index++;
+    if (state.index % PASS_BONUS_EVERY === 0) state.passes++;
+    clearTimeout(state.nextId);
+    state.nextId = setTimeout(showPrepScreen, delay);
+}
+
+function endGame() {
+    clearInterval(state.timerId);
+    clearTimeout(state.nextId);
+    clearFeedback();
+    state.locked = true;
+    state.paused = false;
+    screens.game.classList.remove('paused');
+
+    const best = loadBest();
+    const isRecord = state.score > best;
+    if (isRecord) saveBest(state.score);
+
+    $('final-score').textContent = state.score;
+    $('final-questions').textContent = state.seen;
+    $('final-best').textContent = Math.max(best, state.score);$('new-record').classList.toggle('hidden', !isRecord);
+    showScreen('end');
+}
+
+/* ===== Olaylar ===== */
+$('btn-start').addEventListener('click', initGame);
+$('btn-begin-question').addEventListener('click', startQuestion);$('btn-restart').addEventListener('click', showWelcome);
+ui.btnSubmit.addEventListener('click', checkAnswer);
+ui.btnPass.addEventListener('click', usePass);
+ui.btnPause.addEventListener('click', togglePause);
+ui.btnHint.addEventListener('click', revealClue);
+$('btn-end').addEventListener('click', endGame);
+ui.answer.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); checkAnswer(); }
+});
+
+showWelcome();
+</script>
+</body>
+</html>
